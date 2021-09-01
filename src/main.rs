@@ -1,5 +1,6 @@
 mod api;
 mod gui;
+mod http;
 mod model;
 mod timeline;
 

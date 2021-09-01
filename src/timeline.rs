@@ -1,7 +1,9 @@
 use crate::api;
 use crate::gui::*;
+use crate::http::HttpMsg;
 use crate::model::note::*;
 use crate::model::user::*;
+use bytes::Bytes;
 use gtk::prelude::{BoxExt, ButtonExt, FrameExt, GridExt, ListBoxRowExt};
 use gtk::Align;
 use log::error;
@@ -9,20 +11,15 @@ use pango::{EllipsizeMode, WrapMode};
 use relm4::factory::{Factory, FactoryPrototype, FactoryVec};
 use relm4::*;
 use relm4::{Model, Sender, Widgets};
-use std::convert::TryInto;
-use std::time::Duration;
-use surf::{Client, Config};
 
 pub struct TimelineModel {
-    http: Client,
     notes: FactoryVec<Note>,
 }
 
 pub enum TimelineMsg {
-    ConnectionError,
     InsertNote(Note),
-    GetAvatar(usize, String),
-    SetAvatar(usize, String, UserAvatar),
+    HttpRequest(HttpMsg),
+    HttpResponse(HttpMsg),
 }
 
 // pub enum TimelineType {
@@ -33,17 +30,7 @@ pub enum TimelineMsg {
 
 impl ComponentUpdate<AppModel> for TimelineModel {
     fn init_model(_parent_model: &AppModel) -> Self {
-        let client: Client = Config::new()
-            .set_timeout(Some(Duration::from_secs(3)))
-            .try_into()
-            .unwrap();
-
-        let client = client
-            // .with(Inspector)
-            .with(surf::middleware::Redirect::default());
-
         TimelineModel {
-            http: client,
             notes: FactoryVec::new(),
             // timeline: TimelineType::Home,
         }
@@ -53,43 +40,37 @@ impl ComponentUpdate<AppModel> for TimelineModel {
         &mut self,
         msg: TimelineMsg,
         _components: &TimelineComponents,
-        sender: Sender<TimelineMsg>,
-        _parent_sender: Sender<AppMsg>,
+        _sender: Sender<TimelineMsg>,
+        parent_sender: Sender<AppMsg>,
     ) {
+        use TimelineMsg::*;
+
         match msg {
-            TimelineMsg::InsertNote(note) => {
+            InsertNote(note) => {
                 self.notes.push(note);
             }
-            TimelineMsg::GetAvatar(index, url) => {
-                let client = self.http.clone();
-
-                spawn_future(async move {
-                    let request = client.get(url.clone()).await;
-                    let avatar = UserAvatar::from_response(url.clone(), request.ok()).await;
-
-                    sender
-                        .send(TimelineMsg::SetAvatar(index, url, avatar))
-                        .unwrap();
-                });
+            HttpRequest(msg) => {
+                parent_sender.send(AppMsg::HttpRequest(msg)).unwrap();
             }
-            TimelineMsg::SetAvatar(index, key, avatar) => {
-                if let Some(note) = self.notes.get_mut(index) {
-                    if let UserAvatar::NotFetched(url) = &note.user.avatar {
-                        if url == &key {
-                            note.user.avatar = avatar.clone();
-                        }
-                    }
-
-                    if let Some(child) = &mut note.note {
-                        if let UserAvatar::NotFetched(url) = &child.user.avatar {
+            HttpResponse(msg) => {
+                if let HttpMsg::SetAvatar(index, key, bytes) = msg {
+                    if let Some(note) = self.notes.get_mut(index) {
+                        if let UserAvatar::NotFetched(url) = &note.user.avatar {
                             if url == &key {
-                                child.user.avatar = avatar.clone();
+                                note.user.avatar = UserAvatar::Fetched(url.clone(), bytes.clone());
+                            }
+                        }
+
+                        if let Some(child) = &mut note.note {
+                            if let UserAvatar::NotFetched(url) = &child.user.avatar {
+                                if url == &key {
+                                    child.user.avatar = UserAvatar::Fetched(url.clone(), bytes);
+                                }
                             }
                         }
                     }
                 }
             }
-            _ => {}
         }
     }
 }
@@ -180,15 +161,7 @@ impl FactoryPrototype for Note {
         for (key, avatar) in &widgets.avatars {
             if let UserAvatar::Fetched(url, bytes) = &self.user.avatar {
                 if url == key {
-                    let bytes = glib::Bytes::from(&bytes.to_vec());
-                    let stream = gio::MemoryInputStream::from_bytes(&bytes);
-
-                    match gdk_pixbuf::Pixbuf::from_stream(&stream, gio::NONE_CANCELLABLE) {
-                        Ok(pixbuf) => avatar.set_from_pixbuf(Some(&pixbuf)),
-                        Err(_) => {
-                            error!("error reading avatar {}:", url);
-                        }
-                    }
+                    set_image_from_bytes(&url, bytes, avatar);
                 }
             }
         }
@@ -196,6 +169,18 @@ impl FactoryPrototype for Note {
 
     fn get_root(widgets: &TimelineFactory) -> &gtk::ListBoxRow {
         &widgets.root
+    }
+}
+
+fn set_image_from_bytes(url: &str, bytes: &Bytes, image: &gtk::Image) {
+    let bytes = glib::Bytes::from(&bytes.to_vec());
+    let stream = gio::MemoryInputStream::from_bytes(&bytes);
+
+    match gdk_pixbuf::Pixbuf::from_stream(&stream, gio::NONE_CANCELLABLE) {
+        Ok(pixbuf) => image.set_from_pixbuf(Some(&pixbuf)),
+        Err(_) => {
+            error!("error reading image {}:", url);
+        }
     }
 }
 
@@ -326,7 +311,9 @@ fn note_header(
         avatars.push((url.clone(), avatar_image.clone()));
 
         spawn_future(async move {
-            sender.send(TimelineMsg::GetAvatar(index, url)).unwrap();
+            sender
+                .send(TimelineMsg::HttpRequest(HttpMsg::GetAvatar(index, url)))
+                .unwrap();
         });
     }
 

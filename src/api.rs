@@ -11,10 +11,10 @@ const API_TOKEN: &str = "";
 
 #[tokio::main]
 async fn begin(sender: Sender<TimelineMsg>) {
-    let err_sender = sender.clone();
+    // let err_sender = sender.clone();
 
     preload_home_timeline(sender).await.unwrap_or_else(|_| {
-        err_sender.send(TimelineMsg::ConnectionError).unwrap();
+        // err_sender.send(TimelineMsg::ConnectionError).unwrap();
     });
 }
 

@@ -1,3 +1,4 @@
+use crate::http::*;
 use crate::timeline::*;
 use gtk::prelude::GtkWindowExt;
 use gtk::PolicyType;
@@ -13,18 +14,28 @@ impl Model for AppModel {
 }
 
 impl AppUpdate for AppModel {
-    fn update(
-        &mut self,
-        _msg: AppMsg,
-        _components: &AppComponents,
-        _sender: Sender<AppMsg>,
-    ) -> bool {
+    fn update(&mut self, msg: AppMsg, components: &AppComponents, _sender: Sender<AppMsg>) -> bool {
+        use AppMsg::*;
+
+        match msg {
+            HttpRequest(msg) => {
+                components.http.send(msg).unwrap();
+            }
+            HttpResponse(msg) => {
+                components
+                    .home_timeline
+                    .send(TimelineMsg::HttpResponse(msg))
+                    .unwrap();
+            }
+        }
+
         true
     }
 }
 
 pub struct AppComponents {
     home_timeline: RelmComponent<TimelineModel, AppModel>,
+    http: AsyncRelmWorker<HttpModel, AppModel>,
 }
 
 impl Components<AppModel> for AppComponents {
@@ -35,11 +46,15 @@ impl Components<AppModel> for AppComponents {
     ) -> Self {
         AppComponents {
             home_timeline: RelmComponent::new(parent_model, parent_widgets, parent_sender.clone()),
+            http: AsyncRelmWorker::with_new_tokio_rt(parent_model, parent_sender),
         }
     }
 }
 
-pub enum AppMsg {}
+pub enum AppMsg {
+    HttpRequest(HttpMsg),
+    HttpResponse(HttpMsg),
+}
 
 pub struct AppWidgets {
     window: gtk::ApplicationWindow,

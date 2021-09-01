@@ -1,6 +1,5 @@
 use crate::INSTANCE;
 use bytes::Bytes;
-use log::debug;
 pub use misskey::model::user::User as ApiUser;
 
 #[derive(Debug, Clone)]
@@ -62,25 +61,6 @@ pub enum UserAvatar {
     NotSet,
     Fetched(String, Bytes),
     NotFetched(String),
-}
-
-impl UserAvatar {
-    pub async fn from_response(url: String, response: Option<surf::Response>) -> Self {
-        debug!("get avatar {}", url);
-
-        if let Some(mut req) = response {
-            if let Ok(body) = req.body_bytes().await {
-                debug!("got avatar {} = {} ({})", url, body.len(), req.status());
-                UserAvatar::Fetched(url, Bytes::from(body))
-            } else {
-                debug!("no avatar {} ({})", url, req.status());
-                UserAvatar::NotSet
-            }
-        } else {
-            debug!("no avatar {}", url);
-            UserAvatar::NotSet
-        }
-    }
 }
 
 pub fn import_user_avatar(api_user: &ApiUser) -> UserAvatar {
