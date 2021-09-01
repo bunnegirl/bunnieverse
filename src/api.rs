@@ -1,10 +1,13 @@
 use crate::model::note::import_note;
 use crate::timeline::TimelineMsg;
+use const_env::from_env;
 use misskey::{prelude::*, WebSocketClient};
 use relm4::Sender;
 
-const API_URL: &str = "wss://bunne.garden/streaming";
-const API_TOKEN: &str = "yv76RUNlMJaxaTtOl2KbZo8QIumQ0MoP";
+#[from_env]
+const API_WS: &str = "";
+#[from_env]
+const API_TOKEN: &str = "";
 
 #[tokio::main]
 async fn begin(sender: Sender<TimelineMsg>) {
@@ -16,7 +19,9 @@ async fn begin(sender: Sender<TimelineMsg>) {
 }
 
 async fn preload_home_timeline(sender: Sender<TimelineMsg>) -> anyhow::Result<()> {
-    let client = WebSocketClient::builder(API_URL)
+    println!("start");
+
+    let client = WebSocketClient::builder(API_WS)
         .token(API_TOKEN)
         .connect()
         .await?;
@@ -40,6 +45,8 @@ async fn preload_home_timeline(sender: Sender<TimelineMsg>) -> anyhow::Result<()
             .send(TimelineMsg::InsertNote(import_note(note, true).await))
             .unwrap();
     }
+
+    println!("done");
 
     Ok(())
 }

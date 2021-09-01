@@ -27,7 +27,7 @@ pub enum NoteKind {
 pub async fn import_note(api_note: ApiNote, recurse: bool) -> Note {
     info!("reading note #{}", api_note.id);
 
-    let user = import_user(&api_note.user);
+    let user = import_user(&api_note.user).await;
 
     let kind = match (
         &api_note.cw,

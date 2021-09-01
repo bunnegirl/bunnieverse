@@ -10,7 +10,7 @@ pub struct User {
     pub avatar: UserAvatar,
 }
 
-pub fn import_user(api_user: &ApiUser) -> User {
+pub async fn import_user(api_user: &ApiUser) -> User {
     let display_name = if let Some(display_name) = api_user.name.clone() {
         display_name
     } else {
@@ -63,9 +63,6 @@ pub enum UserAvatar {
     Fetched(String, Bytes),
     NotFetched(String),
 }
-
-// https://blob.jortage.com/blobs/4/d92/4d92366c52c5755bf821961adaea6e89cfdbca7741e4b082f3a9f01e266f412630d5f85e164c2577733d0b18214231a4ae216c1e9d2245c117e0f143df808f38
-// https://pool.jortage.com/pluralcafe/accounts/avatars/000/113/478/original/1950ffd6168e5056.png
 
 impl UserAvatar {
     pub async fn from_response(url: String, response: Option<surf::Response>) -> Self {
