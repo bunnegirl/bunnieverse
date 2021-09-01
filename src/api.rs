@@ -1,0 +1,49 @@
+use crate::model::note::import_note;
+use crate::timeline::TimelineMsg;
+use misskey::{prelude::*, WebSocketClient};
+use relm4::Sender;
+
+const API_URL: &str = "wss://bunne.garden/streaming";
+const API_TOKEN: &str = "yv76RUNlMJaxaTtOl2KbZo8QIumQ0MoP";
+
+#[tokio::main]
+async fn begin(sender: Sender<TimelineMsg>) {
+    let err_sender = sender.clone();
+
+    preload_home_timeline(sender).await.unwrap_or_else(|_| {
+        err_sender.send(TimelineMsg::ConnectionError).unwrap();
+    });
+}
+
+async fn preload_home_timeline(sender: Sender<TimelineMsg>) -> anyhow::Result<()> {
+    let client = WebSocketClient::builder(API_URL)
+        .token(API_TOKEN)
+        .connect()
+        .await?;
+
+    // use std::str::FromStr;
+
+    // let id = misskey::model::id::Id::<misskey::model::note::Note>::from_str("8q3jt2i0hb").unwrap();
+
+    // let note = client.get_note(id).await.unwrap();
+
+    // sender
+    //     .send(TimelineMsg::InsertNote(import_note(note, true).await))
+    //     .unwrap();
+
+    use futures::stream::{StreamExt, TryStreamExt};
+
+    let mut timeline = client.home_notes(..).take(20);
+
+    while let Some(note) = timeline.try_next().await? {
+        sender
+            .send(TimelineMsg::InsertNote(import_note(note, true).await))
+            .unwrap();
+    }
+
+    Ok(())
+}
+
+pub fn thread(sender: Sender<TimelineMsg>) {
+    begin(sender);
+}

@@ -1,0 +1,24 @@
+[package]
+name = "bunnieverse"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+async-recursion = "0.3.2"
+async-trait = "0.1.51"
+bytes = "1.1"
+anyhow = "1.0"
+env_logger = "0.9"
+futures = "0.3"
+glib = "0.14"
+gdk-pixbuf = "0.14"
+gio = "0.14"
+gtk = { version = "0.2", package = "gtk4" }
+log = "0.4"
+misskey = { git = "https://github.com/bunnegirl/misskey-rs.git", branch = "pr/emoji-alias-crash", default-features = false, features = ["inspect-contents", "websocket-client", "async-std-runtime", "aid"] }
+pango = "0.14"
+relm4 = { version = "0.1.0-beta.9", features = ["tokio-rt"] }
+relm4-macros = "0.1.0-beta.9"
+relm4-components = "0.1.0-beta.9"
+surf = { version = "2.2", default-features = false, features = ["h1-client-rustls"] }
+tokio = { version = "1.0", features = ["full"] }

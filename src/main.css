@@ -1,0 +1,6 @@
+frame.timeline row {
+	border-top: 1px solid @borders;
+}
+frame.timeline row:first-child {
+	border-top: none;
+}
